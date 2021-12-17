@@ -1,6 +1,10 @@
 import numpy as np
 from queue import PriorityQueue
 
+
+import numpy as np
+from queue import PriorityQueue
+
 class GraphDomain:
     def __init__(self, path, name = 'NULL', pad = 1):
         self.NAME = name
@@ -16,7 +20,7 @@ class GraphDomain:
 
         self.pad = pad
         self.load_data(path)
-        self.build_graph()
+        self.build_graph_Floyd_Warshall()
  
         
     def load_data(self, path):
@@ -48,6 +52,7 @@ class GraphDomain:
             for v in range(self.pad, self.pad+self.NUM_NODE):
                 self.adj[d][v] = list()
                 self.distance[d][v] = np.full((self.NUM_NODE+self.pad,), np.inf)
+                self.distance[d][v][v] = 0
                 self.pre_node[d][v] = np.full((self.NUM_NODE+self.pad,), -1)
         
         for e in edges:
@@ -55,8 +60,21 @@ class GraphDomain:
             e = e.split(' ')
             #u = e[0], v = e[1], w = e[2], d = e[3]
             self.adj[int(e[3])][int(e[0])].append((int(e[1]), int(e[2])))
+            self.distance[int(e[3])][int(e[0])][int(e[1])] = min(self.distance[int(e[3])][int(e[0])][int(e[1])], int(e[2]))
             
-        
+    def Floyd_Warshall(self, domain):
+        dis = self.distance[domain]
+        for k in range(self.pad, self.pad+self.NUM_NODE):
+            if len(self.adj[domain][k]) != 0:
+                self.domain_start_nodes[domain].append(k)
+            for i in range(self.pad, self.pad+self.NUM_NODE):
+                for j in range(self.pad, self.pad+self.NUM_NODE):
+                    dis[i][j] = min(dis[i][j], dis[i][k] + dis[k][j])
+    
+    def build_graph_Floyd_Warshall(self):
+        for d in range(self.pad, self.NUM_DOMAIN+self.pad):
+            self.Floyd_Warshall(d)
+                
 
     def Dijkstra(self, domain, start, to_show=False):
         if(to_show):
@@ -91,8 +109,7 @@ class GraphDomain:
                 self.Dijkstra(d, v)
                 if len(self.adj[d][v]) != 0:
                     self.domain_start_nodes[d].append(v)
-
-
+    
 
 class AlgorithmV1(GraphDomain):
 
@@ -203,27 +220,42 @@ class EncodePriority(GraphDomain):
 
         dis = np.full((self.NUM_NODE+1,), np.inf)
         dis[self.START_NODE] = 0
+        curr_domain = domains[0]
+        start_PQ = PriorityQueue()
+        start_PQ.put((dis[self.START_NODE], self.START_NODE))
 
-        for d in domains:
-            PQ = PriorityQueue()
-            for u in self.domain_start_nodes[d]:
-                if (dis[u] != np.inf):
-                    PQ.put((dis[u], u))
+        for next_domain in domains[1:]:
+            end_PQ = PriorityQueue()
 
-            while not PQ.empty():
-                top = PQ.get()
-                u = top[1]  
+            while not start_PQ.empty():
+                top = start_PQ.get()
+                u = top[1]
+
                 for i in range(1, 1+self.NUM_NODE):
-                    if dis[u] + self.distance[d][u][i] < dis[i]:
-                        dis[i] = dis[u] + self.distance[d][u][i]
-        
+                    if dis[u] + self.distance[curr_domain][u][i] < dis[i]:
+                        dis[i] = dis[u] + self.distance[curr_domain][u][i]
+                        if len(self.adj[next_domain][i]):
+                            end_PQ.put((dis[i], i))
+                # for i in self.domain_start_nodes[next_domain]:
+                #     if self.distance[curr_domain][u][i] != np.inf:
+                #         end_PQ.put((dis[i], i))
+
+            start_PQ = end_PQ
+            curr_domain = next_domain
+
+        while not start_PQ.empty():
+            top = start_PQ.get()
+            u = top[1]
+
+            for i in range(1, 1+self.NUM_NODE):
+                if dis[u] + self.distance[curr_domain][u][i] < dis[i]:
+                    dis[i] = dis[u] + self.distance[curr_domain][u][i]        
+    
         return dis[self.END_NODE]
 
-
-    def show_path(self, indiv):
+    def show_path(self, indiv, th = 5):
         # find path                  
-        indiv = self.Decode(indiv)
-        domains = np.argsort(-np.array(indiv)) + 1
+        domains = self.Decode(indiv)
 
         dis = np.full((self.NUM_NODE+1,), np.inf)
         end_domain = np.full((self.NUM_NODE+1,), -1)            #end domain of shortest path to the node
@@ -231,15 +263,45 @@ class EncodePriority(GraphDomain):
         dis[self.START_NODE] = 0
         end_domain[self.START_NODE] = 0
 
-        for d in domains:
-            for u in self.domain_start_nodes[d]:
-                if (dis[u] != np.inf):             
-                    for i in range(1, 1+self.NUM_NODE):
-                        if dis[u] + self.distance[d][u][i] < dis[i]:
-                            dis[i] = dis[u] + self.distance[d][u][i]
-                            end_domain[i] = d
-                            pre[d][i][0] = end_domain[u]
-                            pre[d][i][1] = u
+        curr_domain = domains[0]
+        start_PQ = PriorityQueue()
+        start_PQ.put((dis[self.START_NODE], self.START_NODE))
+
+        for next_domain in domains[1:]:
+            end_PQ = PriorityQueue()
+
+            t = 0
+            while not start_PQ.empty() and t < th:
+                top = start_PQ.get()
+                u = top[1]
+
+                for i in range(1, 1+self.NUM_NODE):
+                    if dis[u] + self.distance[curr_domain][u][i] < dis[i]:
+                        dis[i] = dis[u] + self.distance[curr_domain][u][i]
+                        end_domain[i] = curr_domain
+                        pre[curr_domain][i][0] = end_domain[u]
+                        pre[curr_domain][i][1] = u
+                        if len(self.adj[next_domain][i]):
+                            end_PQ.put((dis[i], i))
+                # for i in self.domain_start_nodes[next_domain]:
+                #     if self.distance[curr_domain][u][i] != np.inf:
+                #         end_PQ.put((dis[i], i))
+                t += 1
+
+            start_PQ = end_PQ
+            curr_domain = next_domain
+
+        while not start_PQ.empty():
+            top = start_PQ.get()
+            u = top[1]
+
+            for i in range(1, 1+self.NUM_NODE):
+                if dis[u] + self.distance[curr_domain][u][i] < dis[i]:
+                    dis[i] = dis[u] + self.distance[curr_domain][u][i]
+                    end_domain[i] = curr_domain
+                    pre[curr_domain][i][0] = end_domain[u]
+                    pre[curr_domain][i][1] = u
+
 
         # show path
         res = []
@@ -266,4 +328,3 @@ class EncodePriority(GraphDomain):
         else:
             print('Error path: Not find path to end node!')
         return res, dis[self.END_NODE]
-        
