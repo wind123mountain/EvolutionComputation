@@ -124,7 +124,6 @@ class AlgorithmV1(GraphDomain):
         tmp = np.argsort(indiv[0]) + 1
         if len(indiv[0]) == self.NUM_DOMAIN: return indiv
 
-
         result = [[], []]
         for i in tmp:
             i = int(i)
@@ -138,12 +137,20 @@ class AlgorithmV1(GraphDomain):
         #     if indiv[0][i] <= self.NUM_DOMAIN:
         #         result[0].append(indiv[0][i])
         #         result[1].append(indiv[1][i])
-        # return np.array(result)
+        # res = np.array(result)
+        # if (res.shape[1]!=0):
+        #     return np.array(res)
+        # else:
+        #     domain = np.random.permutation(range(1,self.NUM_DOMAIN+1))
+        #     edge = np.random.randint(self.NUM_NODE, size=self.NUM_DOMAIN)
+        #     indiv = np.array([domain,edge])
+        #     return indiv
+
 
 
     def Cost(self, indiv):
         indiv = self.Decode(indiv)
-        # print('indiv',indiv)
+        # print('decode',indiv)
 
         # path = []
         weight = 0
@@ -152,8 +159,12 @@ class AlgorithmV1(GraphDomain):
         end_domains = []   #(domain, weight, index in path)
         start_node = self.START_NODE
 
+        # print('domains',domains)
+
         for next_domain in domains[1:]:
             start_node_set = []
+            # print('next_domain',next_domain)
+            # print('domain_start_nodes',self.domain_start_nodes)
             for v in self.domain_start_nodes[next_domain]:
                 if self.distance[curr_domain][start_node][v] != np.inf:
                     start_node_set.append(v)
