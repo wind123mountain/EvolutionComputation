@@ -20,7 +20,6 @@ class GraphDomain:
         self.build_graph()
 
         self.best = np.inf
-        self.indiv_best = []
  
         
     def load_data(self, path):
@@ -98,7 +97,6 @@ class GraphDomain:
                     self.domain_start_nodes[d].append(v)
 
     def Decode(self, indiv):
-        indiv = np.argsort(indiv) + 1
         if len(indiv) == self.NUM_DOMAIN: return indiv
         result = []
         for i in indiv:
@@ -127,7 +125,7 @@ class GraphDomain:
                         if pre_dis[u] + self.distance[d][u][i] < dis[i]:
                             dis[i] = pre_dis[u] + self.distance[d][u][i]
 
-            if res > dis[self.END_NODE]:
+            if res > dis[self.END_NODE] or id == 2:
                 res = dis[self.END_NODE]
                 index = id
             if id > 2:
@@ -138,7 +136,25 @@ class GraphDomain:
             pre_dis = dis
             id += 1
 
-        if self.best >= res:
-            self.best = res
-            self.indiv_best = indiv
+        self.best = min(self.best, res)
+
         return res
+
+    # def Cost(self, indiv):
+    #     domains = self.Decode(indiv)
+
+    #     dis = copy.copy(self.distance[domains[0]][self.START_NODE])
+    #     dis[self.START_NODE] = 0
+
+    #     for d in domains[1:]:
+    #         for u in self.domain_start_nodes[d]:
+    #             if (dis[u] != np.inf):             
+    #                 for i in range(1, 1+self.NUM_NODE):
+    #                     if dis[u] + self.distance[d][u][i] < dis[i]:
+    #                         dis[i] = dis[u] + self.distance[d][u][i]
+        
+    #         # tmp_best = min(dis)
+    #         # if tmp_best >= self.best:
+    #         #     break
+            
+    #     return dis[self.END_NODE]

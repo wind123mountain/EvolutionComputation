@@ -20,7 +20,6 @@ class GraphDomain:
         self.build_graph()
 
         self.best = np.inf
-        self.indiv_best = []
  
         
     def load_data(self, path):
@@ -98,7 +97,6 @@ class GraphDomain:
                     self.domain_start_nodes[d].append(v)
 
     def Decode(self, indiv):
-        indiv = np.argsort(indiv) + 1
         if len(indiv) == self.NUM_DOMAIN: return indiv
         result = []
         for i in indiv:
@@ -138,7 +136,6 @@ class GraphDomain:
             pre_dis = dis
             id += 1
 
-        if self.best >= res:
-            self.best = res
-            self.indiv_best = indiv
-        return res
+        self.best = min(self.best, res)
+        return res, id
+        

@@ -3,11 +3,12 @@ import random
 import math
 from scipy.stats import rankdata
 
-class SR_MFEA:
-    def __init__(self, Tasks, NUM_TASK, MAX_DIM , sizePop, TH,Pa,Pb,epochs):
+class SR_MFEA_V1:
+    def __init__(self, Tasks, NUM_TASK, MAX_DIM, MAX_NODE, sizePop, TH, Pa, Pb, epochs):
         self.Tasks = Tasks
         self.NUM_TASK = NUM_TASK
         self.MAX_DIM  = MAX_DIM
+        self.MAX_NODE = MAX_NODE
         self.sizePop = sizePop
         self.n = sizePop
         self.k = self.NUM_TASK
@@ -20,7 +21,9 @@ class SR_MFEA:
         self.a1, self.b1, self.a2, self.b2 = self.heSo()
 
     def GeneratorIndiv(self):
-        indiv = np.random.sample(self.MAX_DIM)
+        domain = np.random.permutation(range(1, self.MAX_DIM+1))
+        edge = np.random.randint(self.MAX_NODE, size=self.MAX_DIM)
+        indiv = np.array([domain,edge])
 
         fac_cost = []
         for task in self.Tasks:
@@ -52,12 +55,10 @@ class SR_MFEA:
         return a1,b1,a2,b2
 
     def fm(self,r):
-        if r >= 1 and r <self.m:
-            return self.a1*r+self.b1
-        elif r == self.m:
-            return self.TH
-        elif r >= self.m+1:
-            return self.a2*r+self.b2
+        if r >= 1 and r <= self.m:
+            return self.a1*r + self.b1
+        else:
+            return self.a2*r + self.b2
 
     def abilitiVector(self,rank):
         abiVector =[]
@@ -78,17 +79,44 @@ class SR_MFEA:
         c1 = 0.5*((1+beta)*p1 + (1-beta)*p2)
         c2 = 0.5*((1-beta)*p1 + (1+beta)*p2)
 
-        return c1, c2
+        return list(c1), list(c2)
+
+    def cut_only_item(self, p1, p2):
+        index = np.random.randint(p1.shape[0])
+        o1 = list(p1[:index]) + list(p2[index:])
+        o2 = list(p2[:index]) + list(p1[index:])
+        return o1, o2
+
+    def cross(self, p1, p2):
+        a,b = self.cross_SBX(p1[0],p2[0])
+        c,d= self.cut_only_item(p1[1],p2[1])
+        return np.array([a,c]), np.array([b,d])
 
     def Diff_Mutation(self,y1,y2,y3,y4):
         F = np.random.random_sample()
         return y1 + F * (y4 - y1 + y2 - y3)
+
+    def mutation_swap(self, individual):
+
+        n = len(individual)
+        res = np.array(individual)
+
+        index1 = np.random.randint(5)
+        index2 = np.random.randint(n)
+        while index1 == index2:
+            index2 = np.random.randint(n)
+
+        temp = res[index1]
+        res[index1] = res[index2]
+        res[index2] = temp
+
+        return res
     
-    def paradox_mutation(self,ind):
-        n = self.MAX_DIM
-        indiv = np.array(ind)
+    def paradox_mutationItem(self, ind):
+        indiv = np.copy(ind)
+        n = len(indiv)
         index1 = 0
-        index2 = np.random.randint(1, n)
+        index2 = np.random.randint(n)
 
         while index1 < index2:
             temp = indiv[index1]
@@ -98,6 +126,12 @@ class SR_MFEA:
             index2 -= 1
 
         return indiv
+    
+    def paradox_mutation(self, indiv):
+        res = []
+        for item in indiv:
+            res.append(self.paradox_mutationItem(item))
+        return res
 
     def Offspring_Generation(self,pop,abiVector,task):
         n = pop.shape[0]
@@ -111,15 +145,21 @@ class SR_MFEA:
             p1,p2 = pop[index1],pop[index2]
 
             if np.random.random_sample() < self.Pa:
-                c1,c2 = self.cross_SBX(p1,p2)
+                c1,c2 = self.cross(p1,p2)
 
                 if np.random.random_sample() < self.Pb:
-                    c1 = self.Diff_Mutation(c1, p1, p2, self.Tasks[task].indiv_best)
-                    c2 = self.Diff_Mutation(c2, p2, p1, self.Tasks[task].indiv_best)
-            else:
-                c1 = self.paradox_mutation(p1)
-                c2 = self.paradox_mutation(p2)
+                    x1 = self.Diff_Mutation(c1[0], p1[0], p2[0], self.Tasks[task].indiv_best[0])
+                    x2 = self.Diff_Mutation(c2[0], p2[0], p1[0], self.Tasks[task].indiv_best[0])
 
+                    x3 = self.mutation_swap(c1[1])
+                    x4 = self.mutation_swap(c2[1])
+
+                    c1 = np.array([x1,x3])
+                    c2 = np.array([x2,x4])
+
+            else:
+                c1 = np.array(self.paradox_mutation(p1))
+                c2 = np.array(self.paradox_mutation(p2))
 
             if np.random.random_sample() < 0.5:
                 a1 = abiVector[index1]
