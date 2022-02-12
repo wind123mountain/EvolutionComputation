@@ -52,12 +52,10 @@ class SR_MFEA:
         return a1,b1,a2,b2
 
     def fm(self,r):
-        if r >= 1 and r <self.m:
-            return self.a1*r+self.b1
-        elif r == self.m:
-            return self.TH
-        elif r >= self.m+1:
-            return self.a2*r+self.b2
+        if r >= 1 and r <= self.m:
+            return self.a1*r + self.b1
+        else:
+            return self.a2*r + self.b2
 
     def abilitiVector(self,rank):
         abiVector =[]
